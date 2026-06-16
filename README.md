@@ -27,7 +27,7 @@ tailscale0 ──► iptables/nftables (NFLOG) ──► go-wol
 ## Requirements
 
 - Ubuntu (or any Linux with netfilter NFLOG, ipset, and netlink)
-- Go 1.22+
+- Go 1.26+ (see `go.mod`)
 - Root or `CAP_NET_ADMIN` + `CAP_NET_RAW`
 - Tailscale on the router (`tailscale0` interface)
 - Static IP-to-MAC mappings in an ipset

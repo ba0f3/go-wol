@@ -37,7 +37,7 @@ sudo ./go-wol
 ## Key Constraints
 
 - **Root required**: `CAP_NET_ADMIN` + `CAP_NET_RAW` for NFLOG, netlink, `SO_BINDTODEVICE`
-- **Go 1.22+** (module declares 1.26)
+- **Go 1.26+** (see `go.mod`)
 - **Single NFLOG group**: Only one consumer per group (stop tcpdump first)
 - **IPv4 only**: Payload parsing rejects IPv6
 - **Rate limiting**: 2-min cache per IP (configurable via `CACHE_TTL`)

@@ -21,7 +21,7 @@ make all
 
 ## Code Standards
 
-- **Go 1.22+** (module declares 1.26)
+- **Go 1.26+** (see `go.mod`)
 - **No external deps** beyond current (go-nflog, netlink, go-cache)
 - **Linux-only** — NFLOG, ipset, netlink are kernel interfaces
 - **Root required** — `CAP_NET_ADMIN` + `CAP_NET_RAW`
