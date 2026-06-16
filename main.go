@@ -15,6 +15,7 @@ import (
 	"github.com/tui/go-wol/ipset"
 	"github.com/tui/go-wol/network"
 	"github.com/tui/go-wol/nflog"
+	"github.com/tui/go-wol/privileges"
 	"github.com/tui/go-wol/service"
 	"github.com/tui/go-wol/wol"
 )
@@ -101,6 +102,10 @@ Install example:
 func runDaemon() {
 	log.Printf("go-wol: starting")
 
+	if !privileges.CanUseNetfilter() {
+		log.Fatalf("go-wol: %v", privileges.NetfilterError())
+	}
+
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
 		log.Fatalf("go-wol: config error: %v", err)
@@ -115,7 +120,6 @@ func runDaemon() {
 	targetIPs := make(chan string, cfg.TargetChanBuf)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	listener, err := nflog.NewListener(cfg.NFLogGroup, targetIPs)
 	if err != nil {
@@ -125,76 +129,105 @@ func runDaemon() {
 
 	var wg sync.WaitGroup
 
+	// Error channel to signal fatal errors from goroutines
+	errCh := make(chan error, 2)
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if err := listener.Run(ctx); err != nil && err != context.Canceled {
 			log.Printf("go-wol: nflog listener exited: %v", err)
+			select {
+			case errCh <- err:
+			default:
+			}
 		}
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		processTargets(targetIPs, resolver, rateLimit, cfg.CacheTTL)
+		processTargets(ctx, targetIPs, resolver, rateLimit, cfg.CacheTTL)
 	}()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	for sig := range sigCh {
-		switch sig {
-		case syscall.SIGHUP:
-			log.Printf("go-wol: received SIGHUP, reloading ipset")
-			if err := resolver.Refresh(); err != nil {
-				log.Printf("go-wol: ipset refresh failed: %v", err)
+	for {
+		select {
+		case sig := <-sigCh:
+			switch sig {
+			case syscall.SIGHUP:
+				log.Printf("go-wol: received SIGHUP, reloading ipset")
+				if err := resolver.Refresh(); err != nil {
+					log.Printf("go-wol: ipset refresh failed: %v", err)
+				}
+			case syscall.SIGINT, syscall.SIGTERM:
+				log.Printf("go-wol: received %s, shutting down", sig)
+				cancel()
+				wg.Wait()
+				log.Printf("go-wol: shutdown complete")
+				return
 			}
-		case syscall.SIGINT, syscall.SIGTERM:
-			log.Printf("go-wol: received %s, shutting down", sig)
+		case err := <-errCh:
+			log.Printf("go-wol: fatal error, shutting down: %v", err)
 			cancel()
-			close(targetIPs)
 			wg.Wait()
-			log.Printf("go-wol: shutdown complete")
+			return
+		case <-ctx.Done():
+			log.Printf("go-wol: context cancelled, shutting down")
+			cancel()
+			wg.Wait()
 			return
 		}
 	}
 }
 
 func processTargets(
+	ctx context.Context,
 	targets <-chan string,
 	resolver *ipset.Resolver,
 	rateLimit *cache.Cache,
 	cacheTTL time.Duration,
 ) {
-	for ip := range targets {
-		log.Printf("processor: handling target IP %s", ip)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("processor: context cancelled, exiting")
+			return
+		case ip, ok := <-targets:
+			if !ok {
+				log.Printf("processor: channel closed, exiting")
+				return
+			}
 
-		if _, found := rateLimit.Get(ip); found {
-			log.Printf("processor: skipping %s (WOL sent recently)", ip)
-			continue
+			log.Printf("processor: handling target IP %s", ip)
+
+			if _, found := rateLimit.Get(ip); found {
+				log.Printf("processor: skipping %s (WOL sent recently)", ip)
+				continue
+			}
+
+			mac, ok := resolver.GetMac(ip)
+			if !ok {
+				log.Printf("processor: skipping %s (not in ipset)", ip)
+				continue
+			}
+			log.Printf("processor: resolved %s -> MAC %s", ip, mac)
+
+			iface, err := network.GetInterfaceForIP(ip)
+			if err != nil {
+				log.Printf("processor: route lookup failed for %s: %v", ip, err)
+				continue
+			}
+
+			if err := wol.SendMagicPacket(mac, iface); err != nil {
+				log.Printf("processor: WOL send failed for %s: %v", ip, err)
+				continue
+			}
+
+			rateLimit.Set(ip, true, cacheTTL)
+			log.Printf("processor: WOL sent for %s, cached for %s", ip, cacheTTL)
 		}
-
-		mac, ok := resolver.GetMac(ip)
-		if !ok {
-			log.Printf("processor: skipping %s (not in ipset)", ip)
-			continue
-		}
-		log.Printf("processor: resolved %s -> MAC %s", ip, mac)
-
-		iface, err := network.GetInterfaceForIP(ip)
-		if err != nil {
-			log.Printf("processor: route lookup failed for %s: %v", ip, err)
-			continue
-		}
-
-		if err := wol.SendMagicPacket(mac, iface); err != nil {
-			log.Printf("processor: WOL send failed for %s: %v", ip, err)
-			continue
-		}
-
-		rateLimit.Set(ip, true, cacheTTL)
-		log.Printf("processor: WOL sent for %s, cached for %s", ip, cacheTTL)
 	}
-
-	log.Printf("processor: channel closed, exiting")
 }

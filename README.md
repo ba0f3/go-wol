@@ -185,6 +185,18 @@ main.go     Wiring, processor loop, signal handling
 
 ## Troubleshooting
 
+**`operation not permitted` on NFLOG bind**
+
+NFLOG requires root or file capabilities:
+
+```bash
+sudo ./go-wol
+# or
+sudo setcap cap_net_admin,cap_net_raw=ep ./go-wol
+```
+
+If installed via systemd, the unit runs as root by default (`go-wol service install`).
+
 **No packets received**
 
 - Confirm iptables/nftables counters increment on the NFLOG rule.

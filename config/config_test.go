@@ -5,12 +5,15 @@ import (
 	"time"
 )
 
-func TestLoadFromEnv_MissingIPSetName(t *testing.T) {
+func TestLoadFromEnv_DefaultIPSetName(t *testing.T) {
 	t.Setenv("IPSET_NAME", "")
 
-	_, err := LoadFromEnv()
-	if err == nil {
-		t.Fatal("expected error when IPSET_NAME is missing")
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("LoadFromEnv: %v", err)
+	}
+	if cfg.IPSetName != "macbinding" {
+		t.Errorf("IPSetName = %q, want macbinding", cfg.IPSetName)
 	}
 }
 

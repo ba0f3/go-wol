@@ -52,6 +52,9 @@ func (r *Resolver) GetMac(ip string) (string, bool) {
 }
 
 func entriesFromResult(result *netlink.IPSetResult) map[string]string {
+	if result == nil {
+		return nil
+	}
 	entries := make(map[string]string, len(result.Entries))
 	for _, entry := range result.Entries {
 		ip := entry.IP.To4()

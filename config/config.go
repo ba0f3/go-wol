@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const maxTargetChanBuf = 10000
+
 // Config holds daemon configuration loaded from environment variables.
 type Config struct {
 	NFLogGroup    uint16
@@ -33,9 +35,8 @@ func LoadFromEnv() (Config, error) {
 		cfg.NFLogGroup = uint16(n)
 	}
 
-	cfg.IPSetName = os.Getenv("IPSET_NAME")
-	if cfg.IPSetName == "" {
-		return Config{}, fmt.Errorf("IPSET_NAME environment variable is required")
+	if v := os.Getenv("IPSET_NAME"); v != "" {
+		cfg.IPSetName = v
 	}
 
 	if v := os.Getenv("CACHE_TTL"); v != "" {
@@ -50,6 +51,9 @@ func LoadFromEnv() (Config, error) {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {
 			return Config{}, fmt.Errorf("invalid TARGET_CHAN_BUF %q: must be positive integer", v)
+		}
+		if n > maxTargetChanBuf {
+			return Config{}, fmt.Errorf("TARGET_CHAN_BUF %d exceeds maximum %d", n, maxTargetChanBuf)
 		}
 		cfg.TargetChanBuf = n
 	}

@@ -26,6 +26,9 @@ func SendMagicPacket(mac string, ifaceName string) error {
 	if err != nil {
 		return fmt.Errorf("parse MAC %q: %w", mac, err)
 	}
+	if len(hwAddr) != 6 {
+		return fmt.Errorf("invalid MAC address length %d, expected 6", len(hwAddr))
+	}
 
 	packet := BuildMagicPacket(hwAddr)
 	log.Printf("wol: sending magic packet for MAC %s via interface %s (%d bytes)",

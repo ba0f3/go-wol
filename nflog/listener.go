@@ -2,12 +2,16 @@ package nflog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"strings"
+	"syscall"
 
 	nflog "github.com/florianl/go-nflog/v2"
 	"github.com/mdlayher/netlink"
+	"github.com/tui/go-wol/privileges"
 )
 
 // Listener receives NFLOG packets and forwards destination IPv4 addresses.
@@ -65,11 +69,14 @@ func (l *Listener) Run(ctx context.Context) error {
 
 	errFunc := func(err error) int {
 		log.Printf("nflog: hook error: %v", err)
-		return 0
+		if nlerr, ok := err.(interface{ Temporary() bool }); ok && nlerr.Temporary() {
+			return 0 // retry on temporary errors
+		}
+		return 1 // abort on fatal errors
 	}
 
 	if err := l.nf.RegisterWithErrorFunc(ctx, hook, errFunc); err != nil {
-		return fmt.Errorf("register nflog hook: %w", err)
+		return fmt.Errorf("register nflog hook: %w", wrapNFLogError(err))
 	}
 
 	<-ctx.Done()
@@ -103,4 +110,14 @@ func extractIPv4Destination(payload []byte) (string, bool) {
 
 	dst := net.IPv4(payload[16], payload[17], payload[18], payload[19])
 	return dst.String(), true
+}
+
+func wrapNFLogError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, syscall.EPERM) || strings.Contains(err.Error(), "not permitted") {
+		return fmt.Errorf("%w\n%w", err, privileges.NetfilterError())
+	}
+	return err
 }
