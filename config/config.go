@@ -22,7 +22,6 @@ type Config struct {
 func LoadFromEnv() (Config, error) {
 	cfg := Config{
 		NFLogGroup:    100,
-		IPSetName:     "macbinding",
 		CacheTTL:      2 * time.Minute,
 		TargetChanBuf: 64,
 	}
@@ -35,8 +34,9 @@ func LoadFromEnv() (Config, error) {
 		cfg.NFLogGroup = uint16(n)
 	}
 
-	if v := os.Getenv("IPSET_NAME"); v != "" {
-		cfg.IPSetName = v
+	cfg.IPSetName = os.Getenv("IPSET_NAME")
+	if cfg.IPSetName == "" {
+		return Config{}, fmt.Errorf("IPSET_NAME environment variable is required")
 	}
 
 	if v := os.Getenv("CACHE_TTL"); v != "" {

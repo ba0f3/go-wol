@@ -1,6 +1,8 @@
 # go-wol
 
-Linux daemon that wakes LAN hosts via Wake-on-LAN when Tailscale traffic arrives at your router.
+**Linux-only** daemon that wakes LAN hosts via Wake-on-LAN when Tailscale traffic arrives at your router.
+
+**Platform:** Linux only — uses kernel interfaces (NFLOG, ipset, netlink). No macOS/Windows support.
 
 When a remote user connects over Tailscale to a sleeping machine on your LAN, the router sees the forwarded SYN packet. This daemon captures that traffic via NFLOG, looks up the destination host's MAC address from an ipset, determines the correct VLAN interface, and sends a WOL magic packet bound to that interface.
 
@@ -109,6 +111,8 @@ Adjust destination ports to match the services you care about (RDP, SMB, SSH, et
 Only one process can listen on a given NFLOG group at a time. Stop `tcpdump` or other NFLOG consumers before starting go-wol.
 
 ## systemd
+
+> **Note:** The service installer uses hardcoded paths: binary at `/usr/local/bin/go-wol`, unit at `/etc/systemd/system/go-wol.service`. To customize, edit `service/systemd.go` before building, or install manually.
 
 Install the service (copies binary to `/usr/local/bin/go-wol`, writes unit file, enables and starts):
 
