@@ -54,9 +54,11 @@ sudo ./go-wol
 
 ## Firewall Rules
 
+Examples use **3389 (RDP)** to wake a Windows host on incoming remote desktop traffic. go-wol extracts only the destination IP — port filtering is optional and can target any service (22, 445, etc.) or be omitted.
+
 **iptables**:
 ```bash
-iptables -A FORWARD -i tailscale0 -p tcp --syn -j NFLOG \
+iptables -A FORWARD -i tailscale0 -p tcp --syn --dport 3389 -j NFLOG \
   --nflog-group 100 --nflog-prefix "TAILSCALE_WOL"
 ```
 

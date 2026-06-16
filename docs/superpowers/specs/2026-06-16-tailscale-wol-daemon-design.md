@@ -198,8 +198,10 @@ Daemon must run as root (or with `CAP_NET_ADMIN` + `CAP_NET_RAW`) for:
 
 ### iptables (group 100)
 
+Examples use port **3389 (RDP)** — waking a PC when a remote desktop connection arrives. go-wol only needs the packet's destination IP, so the same setup works for SSH, SMB, or any other service; change or remove the port filter in firewall rules as needed.
+
 ```bash
-iptables -A FORWARD -i tailscale0 -p tcp --syn -j NFLOG \
+iptables -A FORWARD -i tailscale0 -p tcp --syn --dport 3389 -j NFLOG \
   --nflog-group 100 --nflog-prefix "TAILSCALE_WOL"
 ```
 

@@ -91,10 +91,12 @@ sudo kill -HUP $(pidof go-wol)
 
 The daemon trusts the firewall to filter traffic. Only packets that match your rules are logged to NFLOG.
 
+> **Note:** The examples below use port **3389 (RDP)** to illustrate waking a Windows PC when a remote desktop connection arrives over Tailscale. go-wol itself only reads the **destination IP** from matched packets — it works for any service. Adjust `--dport` / `tcp dport` in your firewall rules for SSH (22), SMB (445), or omit port filtering to wake on any TCP SYN to LAN hosts.
+
 ### iptables
 
 ```bash
-sudo iptables -A FORWARD -i tailscale0 -p tcp --syn -j NFLOG \
+sudo iptables -A FORWARD -i tailscale0 -p tcp --syn --dport 3389 -j NFLOG \
   --nflog-group 100 --nflog-prefix "TAILSCALE_WOL"
 ```
 
@@ -105,8 +107,6 @@ sudo nft add rule inet filter forward iifname "tailscale0" \
   tcp flags syn tcp dport '{3389, 445, 22}' \
   log group 100 prefix "TAILSCALE_WOL"
 ```
-
-Adjust destination ports to match the services you care about (RDP, SMB, SSH, etc.).
 
 Only one process can listen on a given NFLOG group at a time. Stop `tcpdump` or other NFLOG consumers before starting go-wol.
 
