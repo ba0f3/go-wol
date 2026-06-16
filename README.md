@@ -110,6 +110,28 @@ Only one process can listen on a given NFLOG group at a time. Stop `tcpdump` or 
 
 ## systemd
 
+Install the service (copies binary to `/usr/local/bin/go-wol`, writes unit file, enables and starts):
+
+```bash
+sudo IPSET_NAME=lan_hosts NFLOG_GROUP=100 CACHE_TTL=2m ./go-wol service install
+```
+
+Uninstall:
+
+```bash
+sudo ./go-wol service uninstall
+```
+
+Manage after install:
+
+```bash
+sudo systemctl status go-wol
+sudo systemctl restart go-wol
+sudo kill -HUP $(pidof go-wol)   # reload ipset
+```
+
+The generated unit file looks like:
+
 ```ini
 [Unit]
 Description=Tailscale Wake-on-LAN daemon
@@ -118,23 +140,16 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+ExecStart=/usr/local/bin/go-wol
 Environment=IPSET_NAME=lan_hosts
 Environment=NFLOG_GROUP=100
-Environment=CACHE_TTL=2m
-ExecStart=/usr/local/bin/go-wol
+Environment=CACHE_TTL=2m0s
+Environment=TARGET_CHAN_BUF=64
 Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-```
-
-Install:
-
-```bash
-sudo cp go-wol /usr/local/bin/
-sudo systemctl daemon-reload
-sudo systemctl enable --now go-wol
 ```
 
 ## Signals
@@ -149,6 +164,7 @@ sudo systemctl enable --now go-wol
 ```
 config/     Environment-based configuration
 ipset/      ipset lookup via netlink and IP→MAC resolver
+service/    systemd install/uninstall helpers
 network/    Outbound interface lookup via netlink
 nflog/      NFLOG listener and IPv4 header parsing
 wol/        Magic packet construction and UDP send

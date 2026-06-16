@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -14,11 +15,74 @@ import (
 	"github.com/tui/go-wol/ipset"
 	"github.com/tui/go-wol/network"
 	"github.com/tui/go-wol/nflog"
+	"github.com/tui/go-wol/service"
 	"github.com/tui/go-wol/wol"
 )
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
+	if len(os.Args) > 1 {
+		if err := handleCommand(os.Args[1:]); err != nil {
+			log.Fatalf("go-wol: %v", err)
+		}
+		return
+	}
+
+	runDaemon()
+}
+
+func handleCommand(args []string) error {
+	switch args[0] {
+	case "service":
+		return handleServiceCommand(args[1:])
+	case "help", "-h", "--help":
+		printUsage()
+		return nil
+	default:
+		return fmt.Errorf("unknown command %q (try: go-wol help)", args[0])
+	}
+}
+
+func handleServiceCommand(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: go-wol service <install|uninstall>")
+	}
+
+	switch args[0] {
+	case "install":
+		cfg, err := config.LoadFromEnv()
+		if err != nil {
+			return err
+		}
+		return service.Install(cfg)
+	case "uninstall":
+		return service.Uninstall()
+	default:
+		return fmt.Errorf("usage: go-wol service <install|uninstall>")
+	}
+}
+
+func printUsage() {
+	fmt.Println(`go-wol - Tailscale Wake-on-LAN daemon
+
+Usage:
+  go-wol                          Run the daemon (requires env config)
+  go-wol service install          Install and start systemd service (root)
+  go-wol service uninstall        Stop and remove systemd service (root)
+  go-wol help                     Show this help
+
+Environment variables:
+  IPSET_NAME        (required) ipset hash:ip,mac set name
+  NFLOG_GROUP       NFLOG group ID (default: 100)
+  CACHE_TTL         WOL rate-limit duration (default: 2m)
+  TARGET_CHAN_BUF   Internal channel buffer (default: 64)
+
+Install example:
+  sudo IPSET_NAME=lan_hosts ./go-wol service install`)
+}
+
+func runDaemon() {
 	log.Printf("go-wol: starting")
 
 	cfg, err := config.LoadFromEnv()
