@@ -36,6 +36,8 @@ func handleCommand(args []string) error {
 	switch args[0] {
 	case "service":
 		return handleServiceCommand(args[1:])
+	case "ipset":
+		return handleIPSetCommand(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -63,6 +65,19 @@ func handleServiceCommand(args []string) error {
 	}
 }
 
+func handleIPSetCommand(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: go-wol ipset <reload>")
+	}
+
+	switch args[0] {
+	case "reload":
+		return service.ReloadIPSet()
+	default:
+		return fmt.Errorf("usage: go-wol ipset <reload>")
+	}
+}
+
 func printUsage() {
 	fmt.Println(`go-wol - Tailscale Wake-on-LAN daemon
 
@@ -70,6 +85,7 @@ Usage:
   go-wol                          Run the daemon (requires env config)
   go-wol service install          Install and start systemd service (root)
   go-wol service uninstall        Stop and remove systemd service (root)
+  go-wol ipset reload             Reload ipset mappings in running daemon
   go-wol help                     Show this help
 
 Environment variables:

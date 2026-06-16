@@ -122,12 +122,18 @@ Uninstall:
 sudo ./go-wol service uninstall
 ```
 
+Reload ipset in the running daemon (sends `SIGHUP`):
+
+```bash
+go-wol ipset reload
+```
+
 Manage after install:
 
 ```bash
 sudo systemctl status go-wol
 sudo systemctl restart go-wol
-sudo kill -HUP $(pidof go-wol)   # reload ipset
+go-wol ipset reload              # or: sudo kill -HUP $(pidof go-wol)
 ```
 
 The generated unit file looks like:
